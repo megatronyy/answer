@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:answer/app/data/db/prompt_dao.dart';
 import 'package:answer/app/data/db/request_parameters_dao.dart';
@@ -7,7 +8,9 @@ import 'package:answer/app/data/db/service_tokens_dao.dart';
 import 'package:answer/app/data/db/service_vendors_dao.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'conversations_dao.dart';
 import 'messages_dao.dart';
@@ -33,19 +36,36 @@ class AppDatabase {
   static Future<void> initialize({
     required String dbName,
   }) async {
-    var databasesPath = await getDatabasesPath();
+    Directory appDocDir = await getApplicationDocumentsDirectory();
+    var databasesPath = appDocDir.path; //await getDatabasesPath();
     var path = join(databasesPath, dbName);
 
     if (kDebugMode) {
       print(path);
     }
 
-    instance.database = await openDatabase(
-      path,
-      onCreate: instance._onCreate,
-      onUpgrade: instance._onUpgrade,
-      version: 4,
-    );
+    instance.database = await _openDatabase(path);
+  }
+
+  static Future<Database> _openDatabase(String path) async {
+    if(Platform.isWindows || Platform.isLinux) {
+      DatabaseFactory _databaseFactory = databaseFactoryFfi;
+      return await _databaseFactory.openDatabase(
+          path,
+        options: OpenDatabaseOptions(
+          onCreate: instance._onCreate,
+          onUpgrade: instance._onUpgrade,
+          version: 4,
+        ),
+      );
+    }else{
+      return await openDatabase(
+        path,
+        onCreate: instance._onCreate,
+        onUpgrade: instance._onUpgrade,
+        version: 4,
+      );
+    }
   }
 
   FutureOr<void> _onCreate(Database db, int version) async {
